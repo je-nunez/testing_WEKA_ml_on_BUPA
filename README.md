@@ -20,7 +20,7 @@ David R. Spiegel, MD, Neetu Dhadwal, MD, Frances Gill, MD  <br />
 **"I'm sober, Doctor, really": Best biomarkers for underreported alcohol use**  <br />
 *Current Psychiatry, Vol. 7, No. 9 / September 2008*
 
-**Disclaimer**: the present project is not related, nor supported, by the references given in the present document, whom should not be contacted in relation to this project.
+**Disclaimer**: the present project is not related, nor supported, by the references given in the present document, who should not be contacted in relation to this project.
 
 # WIP
 
