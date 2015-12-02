@@ -14,10 +14,10 @@ This dataset is also available in `R` (at least) in the `Kernel Distance Weighte
           data(BUPA)
           # head(BUPA)
 
-For other use of the biological markers as statistical covariates in the analysis, see, for example in the literature, this [article] (http://www.currentpsychiatry.com/index.php?id=22661&tx_ttnews[tt_news]=173698):
+For other use of these biological markers as statistical covariates in the analysis, see, for example in the literature, this [article] (http://www.currentpsychiatry.com/index.php?id=22661&tx_ttnews[tt_news]=173698):
 
-David R. Spiegel, MD, Neetu Dhadwal, MD, Frances Gill, MD
-**"I'm sober, Doctor, really": Best biomarkers for underreported alcohol use**
+David R. Spiegel, MD, Neetu Dhadwal, MD, Frances Gill, MD  <br />
+**"I'm sober, Doctor, really": Best biomarkers for underreported alcohol use**  <br />
 *Current Psychiatry, Vol. 7, No. 9 / September 2008*
 
 
@@ -36,8 +36,8 @@ Also, a `time-series` could also be of use for analyzing the progression of the 
 
 For example, this possible, hidden Bayes influence among some ranges of values of some of the covariates can be seen [here] (http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3866949/):
 
-Botros, Mona, and Kenneth A Sikaris.
-**The De Ritis Ratio: The Test of Time.**
+Botros, Mona, and Kenneth A Sikaris.  <br />
+**The De Ritis Ratio: The Test of Time.**  <br />
 *The Clinical Biochemist Reviews 34.3 (2013): 117–130*
 
 *De Ritis described the ratio between the serum levels of aspartate transaminase (AST) and alanine transaminase (ALT) almost 50 years ago.* (Sidenote: These are two of the covariates given in the BUPA datasets, represented here as the `sgot` and `sgpt` attributes, respectively.) *While initially described as a characteristic of acute viral hepatitis where ALT was usually higher than AST, other authors have subsequently found it useful in alcoholic hepatitis, where AST is usually higher than ALT. These interpretations are far too simplistic however as acute viral hepatitis can have AST greater than ALT, and this can be a sign of fulminant disease, while alcoholic hepatitis can have ALT greater than AST when several days have elapsed since alcohol exposure. The ratio therefore represents the time course and aggressiveness of disease that would be predicted from the relatively short half-life of AST (18 h) compared to ALT (36 h). In chronic viral illnesses such as chronic viral hepatitis and chronic alcoholism as well as non-alcoholic fatty liver disease, an elevated AST/ALT ratio is predictive of long terms complications including fibrosis and cirrhosis... Ideally laboratories should be using pyridoxal phosphate supplemented assays in alcoholic, elderly and cancer patients who may be pyridoxine deplete. Ideally all laboratories reporting abnormal ALT should also report AST and calculate the De Ritis ratio because it provides useful diagnostic and prognostic information.*
