@@ -14,6 +14,13 @@ This dataset is also available in `R` (at least) in the `Kernel Distance Weighte
           data(BUPA)
           # head(BUPA)
 
+For other use of the biological markers as statistical covariates in the analysis, see, for example in the literature, this [article] (http://www.currentpsychiatry.com/index.php?id=22661&tx_ttnews[tt_news]=173698):
+
+David R. Spiegel, MD, Neetu Dhadwal, MD, Frances Gill, MD
+**"I'm sober, Doctor, really": Best biomarkers for underreported alcohol use**
+*Current Psychiatry, Vol. 7, No. 9 / September 2008*
+
+
 # WIP
 
 This project is a *work in progress*. The implementation is *incomplete* and
@@ -26,6 +33,14 @@ It possibly could also be said that those sub-structures in the liver are functi
 The issue is whether there exists any hidden Bayes influence among the covariates. Based on the above tentative hypothesis that the liver is composed of different semi-independent sub-structures (more auto-correlated within themselves than with other sub-structures), then a `random forest` could be a proper simplification of this whole task, which doesn't ignore the possible Bayes influence among some values of the covariariates, and also, with each tree being a smaller task analyzing the hipothesis of that auto-correlated sub-structure in the liver.
 
 Also, a `time-series` could also be of use for analyzing the progression of the auto-correlation among the different covariates in the liver disorders arising from excessive alcohol consumption. Such a time-series can also give an idea of natural kernels where alcoholism appears in sub-structures in the liver. But the BUPA dataset does not offer such a times-series. Also, in respect of maintaining a time-series, see the financial cost associated with the tests in this dataset (in the [`./costs/`](http://archive.ics.uci.edu/ml/machine-learning-databases/liver-disorders/costs/)  subdirectory in the UC Irvine Machine Learning Repository for the BUPA samples).
+
+For example, this possible, hidden Bayes influence among some ranges of values of some of the covariates can be seen [here] (http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3866949/):
+
+Botros, Mona, and Kenneth A Sikaris.
+**The De Ritis Ratio: The Test of Time.**
+*The Clinical Biochemist Reviews 34.3 (2013): 117–130*
+
+*De Ritis described the ratio between the serum levels of aspartate transaminase (AST) and alanine transaminase (ALT) almost 50 years ago.* (Sidenote: These are two of the covariates given in the BUPA datasets, represented here as the `sgot` and `sgpt` attributes, respectively.) *While initially described as a characteristic of acute viral hepatitis where ALT was usually higher than AST, other authors have subsequently found it useful in alcoholic hepatitis, where AST is usually higher than ALT. These interpretations are far too simplistic however as acute viral hepatitis can have AST greater than ALT, and this can be a sign of fulminant disease, while alcoholic hepatitis can have ALT greater than AST when several days have elapsed since alcohol exposure. The ratio therefore represents the time course and aggressiveness of disease that would be predicted from the relatively short half-life of AST (18 h) compared to ALT (36 h). In chronic viral illnesses such as chronic viral hepatitis and chronic alcoholism as well as non-alcoholic fatty liver disease, an elevated AST/ALT ratio is predictive of long terms complications including fibrosis and cirrhosis... Ideally laboratories should be using pyridoxal phosphate supplemented assays in alcoholic, elderly and cancer patients who may be pyridoxine deplete. Ideally all laboratories reporting abnormal ALT should also report AST and calculate the De Ritis ratio because it provides useful diagnostic and prognostic information.*
 
 # Required Libraries
 
