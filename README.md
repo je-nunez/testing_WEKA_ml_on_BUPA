@@ -17,7 +17,7 @@ This dataset is also available in `R` (at least) in the `Kernel Distance Weighte
 For other use of these biological markers as statistical covariates in the analysis, see, for example in the specialized literature, this [article] (http://www.currentpsychiatry.com/index.php?id=22661&tx_ttnews[tt_news]=173698):
 
 David R. Spiegel, MD, Neetu Dhadwal, MD, Frances Gill, MD  <br />
-**"I'm sober, Doctor, really": Best biomarkers for underreported alcohol use**  <br />
+[**"I'm sober, Doctor, really": Best biomarkers for underreported alcohol use**](http://www.currentpsychiatry.com/index.php?id=22661&tx_ttnews[tt_news]=173698)  <br />
 *Current Psychiatry, Vol. 7, No. 9 / September 2008*
 
 **Disclaimer**: the present project is not related, nor supported, nor endorsed by the references given in the present document, who should not be contacted in relation to this project.
@@ -38,7 +38,7 @@ Also, a `time-series` could also be of use for analyzing the progression of the 
 For example, this possible, hidden Bayes influence among some ranges of values of some of the covariates can be seen [here] (http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3866949/):
 
 Botros, Mona, and Kenneth A Sikaris.  <br />
-**The De Ritis Ratio: The Test of Time.**  <br />
+[**The De Ritis Ratio: The Test of Time.**](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3866949/)  <br />
 *The Clinical Biochemist Reviews 34.3 (2013): 117–130*
 
 This is a cite from the article above with a **sidenote** of us in relation to the covariates in the BUPA dataset:
@@ -57,7 +57,7 @@ This is an example of how most instances of the BUPA dataset are seen by the WEK
       6. drinks:   number of half-pint equivalents of alcoholic beverages drunk per day
       7. selector: whether this indivual suffers from alcoholism (1 = No/2 = Yes)
 
-Using WEKA classifier: **weka.classifiers.trees.RandomForest** with options: `-I 120 -K 0 -S 1 -print -num-slots 4`.
+Using WEKA classifier: **weka.classifiers.trees.RandomForest** with options: `-I 120 -K 0 -S 1 -print -num-slots 4` (these parameters for the WEKA Random Forest classifier are similar in idea to the Random Forest in Apache Mahout: see some Mahout examples here [//mahout.apache.org/users/classification/partial-implementation.html](https://mahout.apache.org/users/classification/partial-implementation.html) and in [https://mahout.apache.org/users/classification/breiman-example.html](https://mahout.apache.org/users/classification/breiman-example.html)).
 
      ...
      gammagt >= 20.5
