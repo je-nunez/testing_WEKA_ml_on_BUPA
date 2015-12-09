@@ -22,6 +22,7 @@ import weka.classifiers.AbstractClassifier
 import weka.classifiers.trees.RandomForest
 
 
+
 /** does a WEKA classification on a CSV text file containing the BUPA
   * liver disorders from excessive alcohol consumption dataset.
   *
@@ -107,7 +108,8 @@ object WekaClassifierOnBupaAlcoholism {
     AbstractClassifier = {
 
       // create the WEKA classifier object
-      val randomForest = new RandomForest()
+      // val randomForest = new RandomForest()
+      val randomForest = new MyCustomRandomForestOpenBagOfTrees()
 
       // Assign default values to the parameters of the classifier.
 
@@ -169,6 +171,47 @@ object WekaClassifierOnBupaAlcoholism {
     println("DEBUG: Random instance(s) to be inferred by the classifier:\n" +
             s + "\n")
     eval.evaluateModel(wekaClassifier, testInstances)
+
     println(eval.toSummaryString("\nResults\n======\n", false))
   }
+
+
+  /** Inherits in Scala from a weka.classifiers.trees.RandomForest class in Java
+    * in order to access the protected member "m_bagger", which has the different
+    * trees the Weka Random Forest classifier has inferred. If we don't inherit
+    * from weka.classifiers.trees.RandomForest, then we wouldn't have access to
+    * its "m_bagger" field member.
+    *
+    * This new class only adds a new method, getTrees(), to WEKA's RandomForest.
+    */
+
+  class MyCustomRandomForestOpenBagOfTrees
+    extends RandomForest() {
+
+      /** returns the Array with the String representation of each tree in the
+        * RandomForest, or an Array with an empty string if the RandomForest
+        * classifier hasn't been built yet.
+        *
+        * @return an Array[String]
+        */
+
+      def getTrees(): Array[String] = {
+        if (m_bagger == null)             // m_bagger can be null in Java
+          // m_bagger is a bag classifier with all the different random trees
+          // the WEKA classifier generated, and is a protected field member in
+          // RandomForest
+          Array("")
+        else
+          // m_bagger is an object of the class weka.classifiers.meta.Bagging, 
+          // but this class doesn't give access to its protected
+          // "m_classifiersCache":
+          //    protected java.util.List<weka.classifiers.Classifier> m_classifiersCache;
+          // To access this protected "m_classifiersCache" in "m_bagger", we
+          // split the String representation "m_bagger" gives from its protected
+          // "m_classifiersCache"
+          m_bagger.toString().split("^RandomTree$")
+      }
+    }
+
 }
+

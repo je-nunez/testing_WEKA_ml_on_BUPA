@@ -57,7 +57,7 @@ This is an example of how most instances of the BUPA dataset are seen by the WEK
       6. drinks:   number of half-pint equivalents of alcoholic beverages drunk per day
       7. selector: whether this indivual suffers from alcoholism (1 = No/2 = Yes)
 
-Using WEKA classifier: **weka.classifiers.trees.RandomForest** with options: `-I 120 -K 0 -S 1 -print -num-slots 4` (these parameters for the WEKA Random Forest classifier are similar in idea to the Random Forest in Apache Mahout: see some Mahout examples here [//mahout.apache.org/users/classification/partial-implementation.html](https://mahout.apache.org/users/classification/partial-implementation.html) and in [https://mahout.apache.org/users/classification/breiman-example.html](https://mahout.apache.org/users/classification/breiman-example.html)).
+Using WEKA classifier: **weka.classifiers.trees.RandomForest** with options: `-I 120 -K 0 -S 1 -print -num-slots 4` (these parameters for the WEKA Random Forest classifier are similar in idea to the Random Forest in Apache Mahout: see some Mahout examples here [https://mahout.apache.org/users/classification/partial-implementation.html](https://mahout.apache.org/users/classification/partial-implementation.html) and in [https://mahout.apache.org/users/classification/breiman-example.html](https://mahout.apache.org/users/classification/breiman-example.html)).
 
      ...
      gammagt >= 20.5
