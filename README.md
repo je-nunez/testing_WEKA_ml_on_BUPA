@@ -84,6 +84,21 @@ It seems that some `times-series` would be nice in order to analyze the evolutio
      |   |   |   |   |   mcv >= 93 : 1 (2/0)
      |   |   |   |   sgot >= 14.5 : 2 (28/0)  <---------------------
 
+Besides the random forest classification, this program tries to find and print all statistical inferences found in the random forest where the state of the samples individual is healthy that it resists some amounts of `drinks` -so they don't have an effect on his/her liver-, or the opposed extreme case, that the biomakers of the liver given in BUPA are so moved that the liver has symptoms of alcoholism without `drinks` influencing this state, and, in these extreme cases, to find what are the boundary values of these biomarkers in which this unfortunate situation occurs. Ie., these trees are pure or extreme cases of the state of the liver, very healthy or very ill, where the `drinks` attribute was analyzed in each step of the classification, but finally was found to have no remarkable relevance for being in the kernel for these extreme cases of health or illness. One example is the tree above this paragraph, and also this tree below, where `drinks` neither affected the inference for this other subset of samples in BUPA:
+
+     sgpt < 21.5
+     |   gammagt < 20.5
+     |   |   gammagt < 14.5
+     |   |   |   alkphos < 70.5
+     |   |   |   |   sgot < 14.5
+     |   |   |   |   |   sgpt < 9.5 : 2 (2/0)
+     |   |   |   |   |   sgpt >= 9.5 : 1 (1/0)
+     |   |   |   |   sgot >= 14.5 : 2 (30/0)
+
+These trees form a boundary of values of the biomarkers for the liver between its very healthy state and its very ill state, where `drinks` no longer influences. E.g., in the two subtrees aboves without `drinks`, it is seen that the value of the biomarker `sgot >= 14.5` (`AST >= 14.5`) is very influential, as well as `sgpt < 21.5` (`ALT < 21.5`) form a risky contour of samples where `drinks` no longer acts as a catalyst in the state of the liver. (Of course, other liver biomarkers also appear in these extreme BUPA trees where `drinks` no longer influences the inference, like `alkphos < 60.5` or `alkphos < 70.5` and `gammagt < 20.5` or `gammagt < 14.5`, but this report is not intended as an exact mathematical result, but as a hint for further medical research of inflexion values in the biomarkers where the liver falls in a state where `drinks` is no longer relevant.)
+
+Note: We could also have told WEKA to ignore the `drinks` attribute **before** building the Random Forest classifier, but in this case, all the trees would be without the `drinks` attribute, and we want those inferences where `drinks` do not influence the result, but `drinks` was analyzed and could have influenced each step of the inference. Ie., we do want to analyze the feature `drinks` in the inference, but to report those extreme trees (cases) of state of the liver where `drinks` no longer acts as a catalyst in them.
+
 # Required Libraries
 
 The `WEKA` jar file needs to be in the `CLASSPATH` when calling Scala. It has been tested with WEKA version 3.7.13.

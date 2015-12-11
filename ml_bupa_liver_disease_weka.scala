@@ -92,13 +92,14 @@ object WekaClassifierOnBupaAlcoholism {
     *
     * @param forData WEKA Instances for which the classifier will be created,
     *                so the initial parametrization of the classifier could
-    *                some characteristics of these WEKA Instances, like the
-    *                number of attributes, etc. NOTE: this method does not
+    *                know some characteristics of these WEKA Instances, like
+    *                the number of attributes, etc. NOTE: this method does not
     *                call `buildClassifier(forData)` on the newly created
     *                classifier.
     * @param wekaOptions the WEKA options to set in the created classifier.
     *                    This method initializes the classifier with some
-    *                    reasonable values for the parameters, and then
+    *                    reasonable values for the parameters, according to
+    *                    the set of (BUPA) instances provided, and then
     *                    applies at the last the requested WEKA options string.
     * @return the new WEKA classifier.
     */
@@ -186,10 +187,21 @@ object WekaClassifierOnBupaAlcoholism {
     * cases of the statistical inferences found in the BUPA dataset where the
     * state of individual is healthy that it resists some amounts of "drinks"
     * -so they don't have an effect on his/her liver-, or the opposed extreme
-    * case, that the biomakers of the liver are so chaotic that the liver has
-    * symptoms of alcoholism without "drinks" influencing this state, and
-    * which are the boundary values of these biomarkers in which this
-    * unfortunate situation occurs (see README of this repository)
+    * case, that the biomakers of the liver are so moved that the liver has
+    * symptoms of alcoholism without "drinks" influencing this state, and, in
+    * these extreme cases, to find what are the boundary values of these
+    * biomarkers in which this unfortunate situation occurs (see README of
+    * this repository). Ie., these trees are pure or extreme cases of the
+    * state of the liver, very healthy or very ill, where the "drinks"
+    * attribute was analyzed in each step of the classification, but finally
+    * was found to have no remarkable relevance for being in the kernel for
+    * these extreme cases of health or illness.
+    *
+    * We could also have told WEKA to ignore the "drinks" attribute _before_
+    * building the Random Forest classifier, but in this case, all the trees
+    * would be without the "drinks" attribute, and we want those inferences
+    * where "drinks" do not influence the result, but "drinks" was analyzed
+    * and could have influenced each branch of the inference.
     *
     * @param wekaClassifier an instance of MyCustomRandomForestOpenBagOfTrees
     *                       on which the classifier has already been built.
@@ -198,31 +210,29 @@ object WekaClassifierOnBupaAlcoholism {
   def printInferencesWithoutDrinks(wekaClassifier: AbstractClassifier) {
 
     // The format of the print-out of the trees in a random forest in WEKA
-    // looks like the lines (for the BUPA datase of influence of alcoholism
-    // on the liver):
+    // is in tree-preoder (the root of the tree appears in the first line,
+    // and lower subtrees appear indented in the following lines) and looks
+    // like (for the BUPA datase of influence of alcoholism on the liver):
     //
-    //    ...
+    //    ... (print-out of WEKA random tree on BUPA dataset)...
     //    |   |   |   drinks >= 5.5
     //    |   |   |   |   sgot < 45
     //    |   |   |   |   |   drinks < 13.5
     //
-    // where each "|" or (comparitive-expression) is a level in the tree.
-    // What we want is to prune those subtrees which has "drinks" in it, because
-    // we want to see WEKA's inferences on the BUPA alcoholism dataset where
-    // the inference is not affected by the "drinks", ie., very healthy cases
-    // where "drinks" don't affect the liver, or very sick cases where the
-    // liver is so affected by alcoholism that that the number of "drinks" no
-    // longer has any effect on its biomarkers.
-    // We could also have told WEKA to ignore the "drinks" attribute _before_
-    // building the Random Forest classifier, but in this case, all the trees
-    // would be without the "drinks" attribute, and we want those inferences
-    // where "drinks" do not influence the result, but it was analyzed and
-    // could have influenced the inference.
+    // where each "|" or (comparitive-expression) creates a new branch in the
+    // tree. We are going to parse (or filter) this tree transversal.
+    //
+    // What we want is to prune those subtrees which have "drinks" in it,
+    // because we want to see WEKA's inferences on the BUPA alcoholism dataset
+    // where the inference is not affected by the "drinks", ie., very healthy
+    // cases where "drinks" hasn't affected the liver, or very sick cases where
+    // the liver is so affected by alcoholism that that the number of "drinks"
+    // no longer has any effect on its biomarkers.
 
     // we'll do this task only for the Random Forest classifier we use
     val randomForest = wekaClassifier.asInstanceOf[MyCustomRandomForestOpenBagOfTrees]
 
-    val attributeToPrune = "drinks"   // this is the feature to prune
+    val rootSubtreeToPrune = "drinks"     // prune these subtrees under "drinks"
 
     for ( strReprTree <- randomForest.getTrees() ) {
       // first version of the code, this needs to be fixed: we need to implement
@@ -233,17 +243,61 @@ object WekaClassifierOnBupaAlcoholism {
       // and
       //     if this line doesn't have "drinks", then push it in the stack, and
       //                                              continue parsing this subtree
+
+      var previousDrinksLevel = -1   // what is the current, highest subtree
+                                     // that is under the influence of "drinks"
+
       for ( lineTreeLevel <- strReprTree.split("\n") ) {
         // we need to check this new line (tree-level) whether it has or not
         // the "drinks" attribute in it (we are interested only in those
         // WEKA statistical inferences where "drinks" was discarded.
-        println(lineTreeLevel)
+
+        var branchedAttrib = "\\b[A-Za-z_][A-Za-z0-9_]*\\b".r findFirstMatchIn lineTreeLevel
+
+        if (branchedAttrib.isDefined) {    // there was a reg-exp match
+           val levelAttribToken = branchedAttrib.get
+           if ( levelAttribToken.matched == rootSubtreeToPrune ) {
+             // The attribute in this level of the inference tree is "drinks".
+             // We need to ignore this line and record at what tree level this
+             // "drinks" has been inferred, so all its subtrees are ignored
+             // (pruned), as being under this node of "drinks"
+
+             // at what character index in the line this "drinks" started
+             val currPosDrink = levelAttribToken.start
+             // See if there was a previous "drinks" seen in a higher tree node
+             // than this one, or to a lower level, ie., if we were already under
+             // a "drinks" subtree
+             if ( previousDrinksLevel == -1 ) {
+               previousDrinksLevel = currPosDrink  // we weren't in a "drinks" subtree
+             } else if ( currPosDrink < previousDrinksLevel ) {
+               // we previously were under a "drinks" subtree, but at a level
+               // farthest from the root of the tree because "currPosDrink" is
+               // less than the old one "previousDrinksLevel".
+               // This means a new subtree has been found at "currPosDrink"
+               previousDrinksLevel = currPosDrink
+             }
+           } else {
+             // it is not "drinks" but another attribute in the BUPA dataset
+             val currPosAttrib = levelAttribToken.start
+             // This current attribute is under a drink subtree if:
+             //   previousDrinksLevel != 1 and previousDrinksLevel < currPosAttrib
+             if ( previousDrinksLevel != -1 &&
+                  currPosAttrib <= previousDrinksLevel )
+                // this "currPosAttrib" is in the same or higher level subtree
+                // than the old "previousDrinksLevel", so it finishes that
+                // previous "drinks" statistical inference subtree
+                previousDrinksLevel = -1    // cleared the subtree indicator
+             }
+             if ( previousDrinksLevel == -1 )   // we aren't currently under a
+                       // statistical inference subtree related with "drinks"
+               println(lineTreeLevel)
+           }
+        }
       }
     }
-  }
 
 
-  /** Inherits in Scala from a weka.classifiers.trees.RandomForest class in Java
+  /** Inherits in Scala from the weka.classifiers.trees.RandomForest class in Java
     * in order to access the protected member "m_bagger", which has the different
     * trees the Weka Random Forest classifier has inferred. If we don't inherit
     * from weka.classifiers.trees.RandomForest, then we wouldn't have access to
@@ -265,17 +319,16 @@ object WekaClassifierOnBupaAlcoholism {
       def getTrees(): Array[String] = {
         if (m_bagger == null)             // m_bagger can be null in Java
           // m_bagger is a bag classifier with all the different random trees
-          // the WEKA classifier generated, and is a protected field member in
-          // RandomForest
+          // the WEKA classifier generated
           Array("")
         else
           // m_bagger is an object of the class weka.classifiers.meta.Bagging,
           // but this class doesn't give access to its protected
           // "m_classifiersCache":
           //    protected java.util.List<weka.classifiers.Classifier> m_classifiersCache;
-          // To access this protected "m_classifiersCache" in "m_bagger", we
-          // split the String representation "m_bagger" gives from its protected
-          // "m_classifiersCache"
+          // To access this protected "m_classifiersCache" member in "m_bagger",
+          // we split the String representation that "m_bagger" gives from its
+          // protected "m_classifiersCache"
           m_bagger.toString().split("^RandomTree$")
       }
     }
