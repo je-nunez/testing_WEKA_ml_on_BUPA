@@ -47,7 +47,7 @@ This is a cite from the article above with a **sidenote** of us in relation to t
 
 # BUPA liver disorders from excessive alcohol consumption classified by WEKA's Random Forest
 
-This is an example of how most instances of the BUPA dataset are seen by the WEKA's Random Forest. (This Scala program takes one instance of the BUPA dataset and removes it.) The description of the labels are:
+This is an example of how most instances of the BUPA dataset are seen by the WEKA's Random Forest. (This Scala program takes one instance of the BUPA dataset and removes it.) The description of the labels (the first five of them are the biomarkers in the liver) are:
 
       1. mcv:      mean corpuscular volume
       2. alkphos:  alkaline phosphotase
@@ -96,6 +96,25 @@ So, in order for this `time-series` of the evolution of the liver under alcoholi
      |   |   |   |   sgot >= 14.5 : 2 (30/0)
 
 These trees form a boundary of values of the biomarkers for the liver between its very healthy state and its very ill state, where `drinks` no longer influences. E.g., in the two subtrees above without `drinks`, it is seen that the value of the biomarker `sgot >= 14.5` (`AST >= 14.5`) is very influential, as well as `sgpt < 21.5` (`ALT < 21.5`), so they could form a risky contour of samples where `drinks` no longer acts as a catalyst in the state of the liver, *according to the samples given in the BUPA dataset*. (Of course, other liver biomarkers also appear in these extreme BUPA trees where `drinks` no longer influences the inference, like `alkphos < 60.5` or `alkphos < 70.5` and `gammagt < 20.5` or `gammagt < 14.5`, so they must be taken as a set of descriptive conditions: but this report that the program gives is not intended as an exact mathematical line of contour dividing health and illness, but as a hint region for further medical research on the characteristics of a time-series **before** it got closer to these inflexion regions in the biomarkers where the liver falls in a state where `drinks` is no longer relevant, or a time-series on how the liver can improve **after** falling into these inflexion values -e.g., to make these biomarkers return again to normal, healthy regions.)
+
+WEKA also gives:
+
+     sgot >= 46 : 2 (13/0)
+
+a one-level subtree (a leaf under the root), with no other attribute required for its inference, according to the Random Forest, but only: `sgot >= 46` ( `AST >= 46`) -the measuring units are according to the BUPA dataset. Hence, the Random Forest with options `-I 120 -K 0 -S 1 -print -num-slots 4` infers from the samples in the BUPA dataset that all individuals who have `sgot >= 46` ( `AST >= 46`), have liver problems, and all other biomarkers of the liver are not necessary for this extreme region, not only the `drinks` feature that we were trying to prune. Note: these are the subset of samples in the BUPA dataset which have `sgot >= 46` ( `AST >= 46`), which all also have `selector == 2` (ie., the liver has symptoms of suffering from alcoholism):
+
+     |mcv|alkphos|sgpt|*sgot*|gammagt|drinks|selector|
+     |--:|--:|--:|--:|--:|--:|--:|
+     |91|72|155|*68*|82|0.5|2|
+     |87|76|22|*55*|9|4.0|2|
+     |90|96|34|*49*|169|4.0|2|
+     |91|74|87|*50*|67|6.0|2|
+     |93|84|58|*47*|62|7.0|2|
+     |92|95|85|*48*|200|8.0|2|
+     |91|62|59|*47*|60|8.0|2|
+     |95|80|50|*64*|55|10.0|2|
+     |98|74|148|*75*|159|0.5|2|
+     |85|58|83|*49*|51|3.0|2|
 
 Note: We could also have told WEKA to ignore the `drinks` attribute **before** building the Random Forest classifier, but in this case, all the trees would be without the `drinks` attribute, and we want those inferences where `drinks` do not influence the result, but `drinks` was nevertheless analyzed and potentially could have influenced each step of the inference. Ie., we do want to analyze the feature `drinks` in the inference, but to report those extreme trees (cases) of state of the liver where `drinks` no longer acts as a catalyst in them.
 

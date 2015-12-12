@@ -10,6 +10,7 @@
 
 
 import scala.util.Random
+import scala.collection.mutable.ArrayBuffer
 import java.io.File
 
 import weka.core.converters.CSVLoader
@@ -143,6 +144,22 @@ object WekaClassifierOnBupaAlcoholism {
     }
 
 
+  /** Returns all the attribute names of a given WEKA data set of instances.
+    *
+    * @param dataSet the dataSet for which to get all the names of its attributes
+    */
+
+  def getAllAttribNames(dataSet: Instances): Array[String] = {
+
+    val attribNames = new ArrayBuffer[String]()
+
+    for (idx <- 0 until dataSet.numAttributes()) {
+      attribNames += dataSet.attribute(idx).name
+    }
+    attribNames.toArray
+  }
+
+
   /** It runs the main program, building the WEKA classifier from the BUPA
     * training data and applying it on the BUPA test data, and printing the
     * results.
@@ -169,7 +186,9 @@ object WekaClassifierOnBupaAlcoholism {
     System.err.println("DEBUG: detailed info about the classification: " +
                          wekaClassifier.toString())
      */
-    printInferencesWithoutDrinks(wekaClassifier)
+    val attribNamesBupa = getAllAttribNames(trainingData)
+
+    printInferencesWithoutDrinks(wekaClassifier, attribNamesBupa)
 
     val s = testInstances.toString()
     println("DEBUG: Random instance(s) to be inferred by the classifier:\n" +
@@ -205,9 +224,14 @@ object WekaClassifierOnBupaAlcoholism {
     *
     * @param wekaClassifier an instance of MyCustomRandomForestOpenBagOfTrees
     *                       on which the classifier has already been built.
+    *
+    * @param allAttribNames the array of all attribute names of the instances
+    *                       classified by "wekaClassifier". (In this case, it
+    *                       is the array of all BUPA attribute names.)
     */
 
-  def printInferencesWithoutDrinks(wekaClassifier: AbstractClassifier) {
+  def printInferencesWithoutDrinks(wekaClassifier: AbstractClassifier,
+                                   allAttribNames: Array[String]) {
 
     // The format of the print-out of the trees in a random forest in WEKA
     // is in tree-preoder (the root of the tree appears in the first line,
@@ -234,7 +258,8 @@ object WekaClassifierOnBupaAlcoholism {
 
     val rootSubtreeToPrune = "drinks"     // prune these subtrees under "drinks"
 
-    for ( strReprTree <- randomForest.getTrees() ) {
+    val treesRandomForest = randomForest.getTrees()
+    for ( (strReprTree, treeIdx) <- treesRandomForest.zipWithIndex ) {
       // first version of the code, this needs to be fixed: we need to implement
       // a stack automata which scans every line of the tree and see if this
       // line has a "drinks" token and in what position (tree-level):
@@ -246,13 +271,15 @@ object WekaClassifierOnBupaAlcoholism {
 
       var previousDrinksLevel = -1   // what is the current, highest subtree
                                      // that is under the influence of "drinks"
+      var thisStringWasARandomTree = false
+      var thisRandomTreeHasBeenPrinted = false
 
       for ( lineTreeLevel <- strReprTree.split("\n") ) {
         // we need to check this new line (tree-level) whether it has or not
         // the "drinks" attribute in it (we are interested only in those
         // WEKA statistical inferences where "drinks" was discarded.
 
-        var branchedAttrib = "\\b[A-Za-z_][A-Za-z0-9_]*\\b".r findFirstMatchIn lineTreeLevel
+        val branchedAttrib = "\\b[A-Za-z_][A-Za-z0-9_]*\\b".r findFirstMatchIn lineTreeLevel
 
         if (branchedAttrib.isDefined) {    // there was a reg-exp match
            val levelAttribToken = branchedAttrib.get
@@ -262,6 +289,7 @@ object WekaClassifierOnBupaAlcoholism {
              // "drinks" has been inferred, so all its subtrees are ignored
              // (pruned), as being under this node of "drinks"
 
+             thisStringWasARandomTree = true    // this set of lines was a Random Tree
              // at what character index in the line this "drinks" started
              val currPosDrink = levelAttribToken.start
              // See if there was a previous "drinks" seen in a higher tree node
@@ -276,8 +304,10 @@ object WekaClassifierOnBupaAlcoholism {
                // This means a new subtree has been found at "currPosDrink"
                previousDrinksLevel = currPosDrink
              }
-           } else {
+           } else if (allAttribNames.indexOf(levelAttribToken.matched) != -1) {
              // it is not "drinks" but another attribute in the BUPA dataset
+             thisStringWasARandomTree = true    // this set of lines was a Random Tree
+
              val currPosAttrib = levelAttribToken.start
              // This current attribute is under a drink subtree if:
              //   previousDrinksLevel != 1 and previousDrinksLevel < currPosAttrib
@@ -288,13 +318,25 @@ object WekaClassifierOnBupaAlcoholism {
                 // previous "drinks" statistical inference subtree
                 previousDrinksLevel = -1    // cleared the subtree indicator
              }
-             if ( previousDrinksLevel == -1 )   // we aren't currently under a
+             if ( previousDrinksLevel == -1 ) { // we aren't currently under a
                        // statistical inference subtree related with "drinks"
                println(lineTreeLevel)
+               thisRandomTreeHasBeenPrinted = true
+             }
+           } else {
+             // some other statistical summary line given by WEKA about this tree
+             println(lineTreeLevel)
            }
         }
+
+      if (thisStringWasARandomTree) {
+        if (thisRandomTreeHasBeenPrinted) 
+          println(f"---- Finished reporting RandomTree $treeIdx with 'drinks' subtrees pruned")
+        else
+          println(f"---- Skipped reporting RandomTree $treeIdx")
       }
     }
+  }
 
 
   /** Inherits in Scala from the weka.classifiers.trees.RandomForest class in Java
@@ -321,7 +363,7 @@ object WekaClassifierOnBupaAlcoholism {
           // m_bagger is a bag classifier with all the different random trees
           // the WEKA classifier generated
           Array("")
-        else
+        else {
           // m_bagger is an object of the class weka.classifiers.meta.Bagging,
           // but this class doesn't give access to its protected
           // "m_classifiersCache":
@@ -329,7 +371,9 @@ object WekaClassifierOnBupaAlcoholism {
           // To access this protected "m_classifiersCache" member in "m_bagger",
           // we split the String representation that "m_bagger" gives from its
           // protected "m_classifiersCache"
-          m_bagger.toString().split("^RandomTree$")
+
+          m_bagger.toString().split("(?sm)^RandomTree$")
+        }
       }
     }
 
