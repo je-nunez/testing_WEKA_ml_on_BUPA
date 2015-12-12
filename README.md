@@ -103,18 +103,18 @@ Not all these extreme regions require a set of descriptive conditions, but some 
 
 a one-level subtree (a leaf under the root), with no other biomarker required for its inference but only: `sgot >= 46` ( `AST >= 46`), according to the Random Forest -the measuring units are according to the BUPA dataset. Hence, the Random Forest with options `-I 120 -K 0 -S 1 -print -num-slots 4` infers from the samples in the BUPA dataset that all individuals who have `sgot >= 46` ( `AST >= 46`), have liver problems, and all other biomarkers of the liver are not necessary for this extreme region, not only the `drinks` feature that we were trying to prune. To verify this simple result against the BUPA dataset directly to see how representative of the total population it is, 8 samples (2.31% of the total) have `sgot >= 46` ( `AST >= 46`), and which, as the Random Forest said, all also have `selector == 2`, ie., the liver has symptoms of suffering from alcoholism:
 
-|mcv|alkphos|sgpt|*sgot*|gammagt|drinks|selector|
+|mcv|alkphos|sgpt|**sgot**|gammagt|drinks|selector|
 |--:|--:|--:|--:|--:|--:|--:|
-|91|72|155|*68*|82|0.5|2|
-|87|76|22|*55*|9|4.0|2|
-|90|96|34|*49*|169|4.0|2|
-|91|74|87|*50*|67|6.0|2|
-|93|84|58|*47*|62|7.0|2|
-|92|95|85|*48*|200|8.0|2|
-|91|62|59|*47*|60|8.0|2|
-|95|80|50|*64*|55|10.0|2|
-|98|74|148|*75*|159|0.5|2|
-|85|58|83|*49*|51|3.0|2|
+|91|72|155|**68**|82|0.5|2|
+|87|76|22|**55**|9|4.0|2|
+|90|96|34|**49**|169|4.0|2|
+|91|74|87|**50**|67|6.0|2|
+|93|84|58|**47**|62|7.0|2|
+|92|95|85|**48**|200|8.0|2|
+|91|62|59|**47**|60|8.0|2|
+|95|80|50|**64**|55|10.0|2|
+|98|74|148|**75**|159|0.5|2|
+|85|58|83|**49**|51|3.0|2|
 
 Note: We could also have told WEKA to ignore the `drinks` attribute **before** building the Random Forest classifier, but in this case, all the trees would be without the `drinks` attribute, and we want those inferences where `drinks` do not influence the result, but `drinks` was nevertheless analyzed and potentially could have influenced each step of the inference. Ie., we do want to analyze the feature `drinks` in the inference, but to report those extreme trees (cases) of state of the liver where `drinks` no longer acts as a catalyst in them.
 
