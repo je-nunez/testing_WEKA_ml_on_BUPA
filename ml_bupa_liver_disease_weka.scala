@@ -17,6 +17,10 @@ import weka.core.converters.CSVLoader
 import weka.core.Utils.splitOptions
 import weka.classifiers.Evaluation
 import weka.core.{Instance, Instances}
+import weka.filters.unsupervised.attribute.AddExpression
+import weka.filters.unsupervised.attribute.Reorder
+import weka.filters.MultiFilter
+import weka.filters.Filter
 
 import weka.classifiers.AbstractClassifier
 // import weka.classifiers.functions.MultilayerPerceptron
@@ -63,6 +67,63 @@ object WekaClassifierOnBupaAlcoholism {
     instancesBUPA.setClassIndex(instancesBUPA.numAttributes() - 1)
 
     instancesBUPA
+  }
+
+
+  /** adds the De Ritis Ratio calculated attribute to the instances read from
+    * the BUPA dataset.
+    *
+    * @param originalInstances the original instances read from the BUPA dataset
+    * @return a WEKA Instances object with the same instances and their De Ritis Ratio
+    */
+
+  def addRitisRatio(originalInstances: Instances): Instances = {
+    // The De Ritis Ratio is defined as:
+    //       = AST / ALT
+    //
+    // In the BUPA instances, AST is the "sgot" attribute, and ALT the "sgpt" attrib
+
+    // newData = new Instances(data)
+    val filterDeRitisRatio = new AddExpression()
+    // filterDeRitisRatio.setIndex(originalInstances.numAttributes() - 2)
+    filterDeRitisRatio.setName("De_Ritis_Ratio")
+
+    // set the expression to find the De Ritis Ratio. First we need to find
+    // positions of "sgot" (AST) attrib and "sgpt" (ALT) attrib in the structure
+    val existingAttribNames = getAllAttribNames(originalInstances)
+    val idx_ast_sgot = existingAttribNames.indexOf("sgot") + 1
+    val idx_alt_sgpt = existingAttribNames.indexOf("sgpt") + 1
+
+    val wekaAttribExpression = f"a$idx_ast_sgot/a$idx_alt_sgpt"
+    // System.err.println(f"DEBUG: De Ritis Liver Ratio: $wekaAttribExpression")
+    filterDeRitisRatio.setExpression(wekaAttribExpression)
+    filterDeRitisRatio.setInputFormat(originalInstances)
+
+    val instancesWithDeRitisRatio = Filter.useFilter(originalInstances, filterDeRitisRatio)
+
+    // swap (reorder) the position of the last and second-to-last attrib columns,
+    // so that the new calculated De Ritis Ratio is not the last column, but
+    // the second-to-last, and the last attribute is the label, the Liver
+    // disorder classification
+
+    val filterReorder = new Reorder()
+    var attribPositions = Array.tabulate(existingAttribNames.size + 1)((i) => i)
+    attribPositions(attribPositions.size - 1) = attribPositions.size - 2
+    attribPositions(attribPositions.size - 2) = attribPositions.size - 1
+
+    filterReorder.setAttributeIndicesArray(attribPositions)
+    filterReorder.setInputFormat(instancesWithDeRitisRatio)
+    filterReorder.setDebug(true)
+
+    val reOrderedAttribInstances = Filter.useFilter(instancesWithDeRitisRatio, filterReorder)
+
+    // set the last column (the Liver disorder) as the classification label
+    reOrderedAttribInstances.setClassIndex(reOrderedAttribInstances.numAttributes() - 1)
+
+    val newRelationName = "De Ritis Ratio in BUPA Liver Disorders Data Set"
+    reOrderedAttribInstances.setRelationName(newRelationName)
+
+    reOrderedAttribInstances
   }
 
 
@@ -169,7 +230,9 @@ object WekaClassifierOnBupaAlcoholism {
 
   def main(args: Array[String]) {
 
-    val trainingData = loadBupaDataSet("bupa_liver_disorders.csv")
+    val trainingDataOrig = loadBupaDataSet("bupa_liver_disorders.csv")
+
+    val trainingData = addRitisRatio(trainingDataOrig)
 
     val testInstances = randomTestSet(trainingData)
 
@@ -330,7 +393,7 @@ object WekaClassifierOnBupaAlcoholism {
         }
 
       if (thisStringWasARandomTree) {
-        if (thisRandomTreeHasBeenPrinted) 
+        if (thisRandomTreeHasBeenPrinted)
           println(f"---- Finished reporting RandomTree $treeIdx with 'drinks' subtrees pruned")
         else
           println(f"---- Skipped reporting RandomTree $treeIdx")
