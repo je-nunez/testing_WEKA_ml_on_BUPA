@@ -10,7 +10,8 @@
 
 
 import scala.util.Random
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, Stack}
+import scala.util.matching._
 import java.io.File
 
 import weka.core.converters.CSVLoader
@@ -20,6 +21,7 @@ import weka.core.{Instance, Instances}
 import weka.filters.unsupervised.attribute.AddExpression
 import weka.filters.unsupervised.attribute.Reorder
 import weka.filters.MultiFilter
+import weka.filters.unsupervised.instance.SubsetByExpression
 import weka.filters.Filter
 
 import weka.classifiers.AbstractClassifier
@@ -230,6 +232,14 @@ object WekaClassifierOnBupaAlcoholism {
 
   def main(args: Array[String]) {
 
+    // whether to dump the leaves of the random trees determined by the
+    // classification
+    var dumpLeavesTree = false
+
+    if (args.size >= 1 && args(0) == "--dump") dumpLeavesTree = true
+
+    // read the BUPA CSV dataset, calculate the De Ritis Ratio, and find
+    // the test set
     val trainingDataOrig = loadBupaDataSet("bupa_liver_disorders.csv")
 
     val trainingData = addRitisRatio(trainingDataOrig)
@@ -245,13 +255,18 @@ object WekaClassifierOnBupaAlcoholism {
               wekaClassifier.getOptions().mkString(" "))
 
     wekaClassifier.buildClassifier(trainingData)
+
     /*
     System.err.println("DEBUG: detailed info about the classification: " +
                          wekaClassifier.toString())
      */
+
     val attribNamesBupa = getAllAttribNames(trainingData)
 
-    printInferencesWithoutDrinks(wekaClassifier, attribNamesBupa)
+    val instancesToDump = if (dumpLeavesTree) Some(trainingData) else None
+
+    printInferencesWithoutDrinks(wekaClassifier, attribNamesBupa, Array("drinks"),
+                                 instancesToDump)
 
     val s = testInstances.toString()
     println("DEBUG: Random instance(s) to be inferred by the classifier:\n" +
@@ -261,6 +276,27 @@ object WekaClassifierOnBupaAlcoholism {
     println(eval.toSummaryString("\nResults\n======\n", false))
   }
 
+  /** truncates the stack at the desired length
+    *
+    * @param stack the stack to truncate
+    *
+    * @param desiredLength the desired length to leave the stack at
+    */
+
+  def truncateStackAtLength[T](stack: Stack[T], desiredLength: Int): Stack[T]
+    = {
+        // println(f"DEBUG: before truncation at length $desiredLength: " + stack.mkString(" -- "))
+        if (stack.length > desiredLength) {
+          if (desiredLength <= 0) {
+            new Stack[T]
+          } else {
+            // drops all the elements in stack that are in excess of desiredLength
+            stack.drop(stack.length - desiredLength)
+          }
+        } else {
+          stack
+        }
+      }
 
   /** receives the wekaClassifier whose classifier has already been built for
     * the BUPA dataset of influence of alcoholism on the liver, and report to
@@ -291,10 +327,25 @@ object WekaClassifierOnBupaAlcoholism {
     * @param allAttribNames the array of all attribute names of the instances
     *                       classified by "wekaClassifier". (In this case, it
     *                       is the array of all BUPA attribute names.)
+    *
+    * @param attribNamesToPrune the array of attribute names whose sub-trees
+    *                       to prune from the report in standard-output of the
+    *                       trees. (In this case, it is an array with some
+    *                       BUPA attribute names to be pruned from the report,
+    *                       e.g., "drinks" to prune its subtrees where it was
+    *                       needed for the inference.)
+    *
+    * @param instancesClassif the instances that were used to build this
+    *                       classifier. This parameter is optional, and if it
+    *                       is given, then it means to report the subset of
+    *                       instances under the leaves of the trees as they
+    *                       are printed out.
     */
 
   def printInferencesWithoutDrinks(wekaClassifier: AbstractClassifier,
-                                   allAttribNames: Array[String]) {
+                                   allAttribNames: Array[String],
+                                   attribNamesToPrune: Array[String],
+                                   instances: Option[Instances]) {
 
     // The format of the print-out of the trees in a random forest in WEKA
     // is in tree-preoder (the root of the tree appears in the first line,
@@ -306,10 +357,16 @@ object WekaClassifierOnBupaAlcoholism {
     //    |   |   |   |   sgot < 45
     //    |   |   |   |   |   drinks < 13.5
     //
-    // where each "|" or (comparitive-expression) creates a new branch in the
-    // tree. We are going to parse (or filter) this tree transversal.
+    // where each "|" or (comparative-expression) creates a new branch in the
+    // tree. The relationship between the starts of the tokens (attribute
+    // names) in the line string and the level of the tree they are at in
+    // WEKA, is, if both are 0-based -ie., the root of the tree is at level 0:
+    //       index-start-token-in-string = 4 * its-level-in-tree
+    // We are going to parse (or filter) this tree transversal.
     //
-    // What we want is to prune those subtrees which have "drinks" in it,
+    // What we want is to prune those subtrees which have "drinks" in it (or
+    // in general, to prune all subtrees under any attribute in the array
+    // "attribNamesToPrune" -we'll talk about "drinks" in this respect)
     // because we want to see WEKA's inferences on the BUPA alcoholism dataset
     // where the inference is not affected by the "drinks", ie., very healthy
     // cases where "drinks" hasn't affected the liver, or very sick cases where
@@ -318,8 +375,6 @@ object WekaClassifierOnBupaAlcoholism {
 
     // we'll do this task only for the Random Forest classifier we use
     val randomForest = wekaClassifier.asInstanceOf[MyCustomRandomForestOpenBagOfTrees]
-
-    val rootSubtreeToPrune = "drinks"     // prune these subtrees under "drinks"
 
     val treesRandomForest = randomForest.getTrees()
     for ( (strReprTree, treeIdx) <- treesRandomForest.zipWithIndex ) {
@@ -332,75 +387,256 @@ object WekaClassifierOnBupaAlcoholism {
       //     if this line doesn't have "drinks", then push it in the stack, and
       //                                              continue parsing this subtree
 
-      var previousDrinksLevel = -1   // what is the current, highest subtree
-                                     // that is under the influence of "drinks"
+      var previousDrinksLevel = -1   // what is the string position of the current,
+                                     // highest subtree that is under the influence
+                                     // of "drinks" (we keep track only of the highest
+                                     // current subtree that we are pruning)
+      var logicalConditionsStack = new Stack[String]()  // the logical conditions
+                                         // that has been collected in the traversal
+                                         // of the WEKA tree so far
       var thisStringWasARandomTree = false
       var thisRandomTreeHasBeenPrinted = false
 
       for ( lineTreeLevel <- strReprTree.split("\n") ) {
         // we need to check this new line (tree-level) whether it has or not
-        // the "drinks" attribute in it (we are interested only in those
-        // WEKA statistical inferences where "drinks" was discarded.
+        // the "drinks" attribute in it (we are interested only in those WEKA
+        // statistical inferences where "drinks" was not necessary for them.
 
         val branchedAttrib = "\\b[A-Za-z_][A-Za-z0-9_]*\\b".r findFirstMatchIn lineTreeLevel
 
         if (branchedAttrib.isDefined) {    // there was a reg-exp match
            val levelAttribToken = branchedAttrib.get
-           if ( levelAttribToken.matched == rootSubtreeToPrune ) {
-             // The attribute in this level of the inference tree is "drinks".
+           // at what character index in the line this attribute starts
+           val currPosAttrib = levelAttribToken.start
+
+           if ( attribNamesToPrune.indexOf(levelAttribToken.matched) != -1 ) {
+             // The attribute in this level of the inference tree is "drinks"
+             // or another in "attribNamesToPrune" whose subtree should also be
+             // pruned from the report.
              // We need to ignore this line and record at what tree level this
              // "drinks" has been inferred, so all its subtrees are ignored
              // (pruned), as being under this node of "drinks"
 
              thisStringWasARandomTree = true    // this set of lines was a Random Tree
-             // at what character index in the line this "drinks" started
-             val currPosDrink = levelAttribToken.start
+
              // See if there was a previous "drinks" seen in a higher tree node
              // than this one, or to a lower level, ie., if we were already under
              // a "drinks" subtree
+             var thisLineStartsANewSubtreeToPrune = false
              if ( previousDrinksLevel == -1 ) {
-               previousDrinksLevel = currPosDrink  // we weren't in a "drinks" subtree
-             } else if ( currPosDrink < previousDrinksLevel ) {
+               thisLineStartsANewSubtreeToPrune = true  // we weren't in a "drinks"
+               previousDrinksLevel = currPosAttrib      // subtree: now we found
+                                                        // one and start pruning it
+             } else if ( currPosAttrib < previousDrinksLevel ) {
                // we previously were under a "drinks" subtree, but at a level
-               // farthest from the root of the tree because "currPosDrink" is
+               // farthest from the root of the tree because "currPosAttrib" is
                // less than the old one "previousDrinksLevel".
-               // This means a new subtree has been found at "currPosDrink"
-               previousDrinksLevel = currPosDrink
+               // This means a new subtree to prune has been found at "currPosAttrib"
+
+               thisLineStartsANewSubtreeToPrune = true
+               previousDrinksLevel = currPosAttrib  // update "previousDrinksLevel" to
+                                                    // this subtree
+
+               if (instances.isDefined) {
+                 // We need to keep track of the logicalConditionsStack.
+                 // The relationship between the beginning of the token,
+                 // "currPosAttrib", and the level in the WEKA random tree,
+                 // since both are 0-indexed, is:
+                 //     currPosAttrib == ( 4 * levelInTree )
+                 // println(f"sync stack because of start of pruning at currPosAttrib = $currPosAttrib")
+                 val levelStack = currPosAttrib/4 - 1   // -1 because we want
+                                                        // anything at this the
+                                                        // current level to be
+                                                        // pruned in the stack
+                 logicalConditionsStack =
+                   truncateStackAtLength(logicalConditionsStack, levelStack)
+               }
+             }
+             if (thisLineStartsANewSubtreeToPrune) {
+               println(lineTreeLevel.substring(0, currPosAttrib) +
+                       "[ ... pruning this subtree because '" +
+                       levelAttribToken.matched +
+                       "' is here at its root ...]")
              }
            } else if (allAttribNames.indexOf(levelAttribToken.matched) != -1) {
              // it is not "drinks" but another attribute in the BUPA dataset
              thisStringWasARandomTree = true    // this set of lines was a Random Tree
 
-             val currPosAttrib = levelAttribToken.start
              // This current attribute is under a drink subtree if:
              //   previousDrinksLevel != 1 and previousDrinksLevel < currPosAttrib
              if ( previousDrinksLevel != -1 &&
-                  currPosAttrib <= previousDrinksLevel )
-                // this "currPosAttrib" is in the same or higher level subtree
-                // than the old "previousDrinksLevel", so it finishes that
-                // previous "drinks" statistical inference subtree
-                previousDrinksLevel = -1    // cleared the subtree indicator
+                  currPosAttrib <= previousDrinksLevel ) {
+               // this "currPosAttrib" is in the same or higher level subtree
+               // than the old "previousDrinksLevel", so it finishes the pruning
+               // set by that previous "drinks" statistical inference subtree
+               previousDrinksLevel = -1    // cleared the subtree indicator,
+                                           // so we stop pruning and start
+                                           // transversing the tree again
              }
              if ( previousDrinksLevel == -1 ) { // we aren't currently under a
                        // statistical inference subtree related with "drinks"
                println(lineTreeLevel)
                thisRandomTreeHasBeenPrinted = true
+
+               if (instances.isDefined) {
+                 // if the instances parameter was given to this method, we need
+                 // to print as well the subset of instances that fall under
+                 // a certain WEKA leaf in the Random Tree. In order to find this
+                 // subset, we need to keep track of the conditions stack as we
+                 // transverse the WEKA random tree string in pre-order
+
+                 // resync stack if necessary
+                 val levelStack = currPosAttrib/4    // both levelStack and currPosAttrib are 0-based
+                 // println(f"resync stack during visiting node at index $currPosAttrib, tree-level $levelStack")
+                 logicalConditionsStack =
+                   truncateStackAtLength(logicalConditionsStack, levelStack)
+
+                 // Try to extract the logical condition expressed in this line.
+                 // For this, we need to see if it is a leaf or a branch in the
+                 // WEKA random tree
+                 val wekaTreeLeafPatt = """ : [1-9][0-9]* \([1-9][0-9]*/[0-9]*\)""".r
+                 val wekaTreeLeaf = wekaTreeLeafPatt findFirstMatchIn lineTreeLevel
+                 if ( ! wekaTreeLeaf.isDefined ) {
+                   // this is a branch in the WEKA tree: the logical condition in
+                   // this line is from the attribute token till the end of line
+                   val conditionInThisBranch = lineTreeLevel.substring(currPosAttrib)
+                   // push this logical condition to the top of the condition stack,
+                   // enclosed by parentheses, "( ... )"
+                   logicalConditionsStack.push(f"( $conditionInThisBranch )")
+                 } else {
+                   // this is a leaf in the WEKA random tree: the logical condition
+                   // in this line is from the attribute token till the leaf
+                   // specification suffix starts.
+                   // (Since this is a leaf, as an optimization we don't push this
+                   //  leaf condition into the "logicalConditionsStack", for it would
+                   //  immediately be pop-ed from it, for this is a leaf.)
+                   val conditionInThisLeaf =
+                     lineTreeLevel.substring(currPosAttrib, wekaTreeLeaf.get.start)
+                   var wekaSubsetExpresssion = ""
+                   if (logicalConditionsStack.length == 0) {
+                     wekaSubsetExpresssion = f"( $conditionInThisLeaf )"
+                   } else {
+                     // get a reverse copy of the stack in order to get the logical
+                     // conjunction "AND ..." of its conditions in human-friendly
+                     // root-down-to-leaf format, not in leaf-up-to-root (polish)
+                     // machine format. (This order is for reporting to the user,
+                     // WEKA's SubsetByExpression filter is fine with both orders.)
+
+                     val logicalConditionsArray = logicalConditionsStack.reverse
+                     wekaSubsetExpresssion = logicalConditionsArray.mkString(" and ") +
+                                               " and ( " + conditionInThisLeaf + " )"
+                   }
+
+                   reportInstancesWhichSupportThisInference(instances.get,
+                                                          wekaSubsetExpresssion,
+                                                          allAttribNames,
+                                                          currPosAttrib,
+                                                          attribNamesToPrune)
+
+                 }
+               }
              }
-           } else {
+           }
+         } else {
              // some other statistical summary line given by WEKA about this tree
              println(lineTreeLevel)
-           }
-        }
+         }
+       }
 
-      if (thisStringWasARandomTree) {
-        if (thisRandomTreeHasBeenPrinted)
-          println(f"---- Finished reporting RandomTree $treeIdx with 'drinks' subtrees pruned")
-        else
-          println(f"---- Skipped reporting RandomTree $treeIdx")
-      }
+       if (thisStringWasARandomTree) {
+         if (thisRandomTreeHasBeenPrinted) {
+           val subtreesPruned = attribNamesToPrune.mkString(", ")
+           println(f"---- Finished reporting RandomTree $treeIdx pruning trees needing any of the attribs: $subtreesPruned")
+         } else {
+           println(f"---- Skipped reporting RandomTree $treeIdx")
+         }
+       }
+     }
+   }
+
+
+  /** prints to standard-output the subset of samples which support a
+    * statistical inference found by WEKA in a tree of a ramdom forest.
+    * The print-out is in CSV format, with a header line and an
+    * indentation prefix in the report to alineate it with the leaf in
+    * the tree that is reporting the subset of samples about
+    *
+    * @param universeSamples a WEKA instances with the universe set of
+    *                        instances from which the random-forest was
+    *                        trained (built).
+    *
+    * @param inferenceConditions a string with the inference logical
+    *                            conditions, which is a logical conjunction
+    *                            "... AND ..." of the conditions on the
+    *                            attribute-names in the random tree from
+    *                            its root till this inferred leaf under
+    *                            which we are reporting
+    *
+    * @param allAttribNames the array of all attribute names in the
+    *                       universeSamples
+    *
+    * @param indentation    the indentation to leave to the left of this
+    *                       print-out in order to alineate it under its
+    *                       leaf in the random tree
+    *
+    * @param attribNamesNotExpected this is an array with the attribute
+    *                               names which are not expected in the
+    *                               logical "inferenceConditions", as to
+    *                               verify that these attributes are not
+    *                               in this logical condition representing
+    *                               this inference
+    */
+
+  def reportInstancesWhichSupportThisInference(universeSamples: Instances,
+                                               inferenceConditions: String,
+                                               allAttribNames: Array[String],
+                                               indentation: Int,
+                                               attribNamesNotExpected: Array[String] ) {
+
+    // println(f"DEBUG: received WEKA conditions for this subset: $inferenceConditions")
+
+    // we don't need to do this, since we expect that no attribute name in
+    // "attribNamesNotExpected": it is just to ensure this state, although this method
+    // can work ignoring this "attribNamesNotExpected", that's a logic imposed by a
+    // client of this method
+    for ( attribPruned <- attribNamesNotExpected ) {
+      val regExpAttribPruned = """\\b""" + Regex.quote(attribPruned) + """\\b""" r
+      val firstPosition = regExpAttribPruned findFirstMatchIn inferenceConditions
+      // attribPruned can't be in the "inferenceConditions", so:
+      assert(! firstPosition.isDefined)
+    }
+
+    // substitute all attribute names in "inferenceConditions" by their corresponding
+    // "ATT<idx#>" tag that WEKA's SubsetByExpression instance filter expects
+    var wekaInferenceConditions = inferenceConditions
+    for ( (attribName, attribIdx) <- allAttribNames.zipWithIndex ) {
+      val regExpAttrib = ("\\b" + Regex.quote(attribName) + "\\b")
+      val wekaAttrIdx = attribIdx + 1
+      wekaInferenceConditions =
+        wekaInferenceConditions.replaceAll(regExpAttrib, f"ATT$wekaAttrIdx")
+    }
+    // println(f"DEBUG: replaced attribute names by ATT# indexes: $wekaInferenceConditions")
+
+    // find the WEKA SubsetByExpression of the samples which support this inference by
+    // random tree
+    val samplesFilter = new SubsetByExpression()
+    samplesFilter.setExpression(wekaInferenceConditions)
+    samplesFilter.setInputFormat(universeSamples)
+    val samplesWhichSupportThisInference = Filter.useFilter(universeSamples, samplesFilter)
+
+    // report these subset of samples which support this inference by the random tree
+    val arffSections = samplesWhichSupportThisInference.toString.split("(?sm)^@data$")
+    val preffixIndent = " " * indentation
+    // write the CSV header line for this subset of samples, indented
+    print(preffixIndent)
+    for ( (attribName, attribIdx) <- allAttribNames.zipWithIndex ) {
+      print(if (attribIdx > 0) f",$attribName" else attribName)
+    }
+    println()
+    for ( csvLine <- arffSections(1).split("\n") if (! csvLine.isEmpty) ) {
+      println(preffixIndent + csvLine)
     }
   }
-
 
   /** Inherits in Scala from the weka.classifiers.trees.RandomForest class in Java
     * in order to access the protected member "m_bagger", which has the different
