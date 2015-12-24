@@ -128,7 +128,7 @@ mcv|alkphos|sgpt|**sgot**|gammagt|drinks|**selector**
 |--:|--:|--:|--:|--:|--:|--:|
 98|66|103|**57**|114|6.0|**1**
 
-Related to this, the program is able to report the subset of training samples which statistically support about an inference a random tree gives. It is the `--dump` command line option, which prints, after each leaf of the tree, the subset of training samples under it (recall that one random sample is removed from the BUPA dataset to be used as the test set, so this will not appear):
+Related to this, the program is able to report the subset of training samples which statistically support an inference a random tree gives. It is the `--dump` command line option, which prints, after each leaf of the tree, the subset of training samples under it (recall that one random sample is removed from the BUPA dataset to be used as the test set, so this will not appear):
 
      mcv >= 85.5
      |   gammagt >= 20.5
@@ -154,7 +154,7 @@ Related to this, the program is able to report the subset of training samples wh
                             86,109,16,22,28,6,1.375,2
                             97,80,17,20,53,8,1.176471,2
 
-Note in the example above that the majority of samples in this region have `selector` with value `2`, except those pointed out which have value `1`.
+The majority of the instances in this region above have `selector` with value `2`, except those pointed out which have value `1`.
 
 Note: We could also have told WEKA to ignore the `drinks` attribute **before** building the Random Forest classifier, but in this case, all the trees would be without the `drinks` attribute, and we want those inferences where `drinks` do not influence the result, but `drinks` was nevertheless analyzed and potentially could have influenced each step of the inference. Ie., we do want to analyze the feature `drinks` in the inference, but to report those extreme trees (cases) of state of the liver where `drinks` no longer acts as a catalyst in them.
 
