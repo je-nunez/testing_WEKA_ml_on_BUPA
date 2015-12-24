@@ -103,20 +103,58 @@ Not all these extreme regions require a set of descriptive conditions, but some 
 
      sgot >= 46 : 2 (13/0)
 
-a one-level subtree (a leaf under the root), with no other biomarker required for its inference but only: `sgot >= 46` ( `AST >= 46`), according to the Random Forest -the measuring units are according to the BUPA dataset. Hence, the Random Forest with options `-I 120 -K 0 -S 1 -print -num-slots 4` infers from the samples in the BUPA dataset that all individuals who have `sgot >= 46` ( `AST >= 46`), have liver problems, and all other biomarkers of the liver are not necessary for this extreme region, not only the `drinks` feature that we were trying to prune. To verify this simple result against the BUPA dataset directly to see how representative of the total population it is, 8 samples (2.31% of the total) have `sgot >= 46` ( `AST >= 46`), and which, as the Random Forest said, all also have `selector == 2`, ie., the liver has symptoms of suffering from alcoholism:
+a one-level subtree (a leaf under the root), with no other biomarker required for its inference but only: `sgot >= 46` ( `AST >= 46`), according to the Random Forest -the measuring units are according to the BUPA dataset. Hence, the Random Forest with options `-I 120 -K 0 -S 1 -print -num-slots 4` infers from the samples in the BUPA dataset that most individuals who have `sgot >= 46` ( `AST >= 46`), have liver problems, and all other biomarkers of the liver do not give more valuable statistical information for this extreme region, not only the `drinks` feature that we were trying to prune. To verify this simple result against the BUPA dataset directly to see how representative of the total population it is, 14 samples (4.05% of the total) have `sgot >= 46` ( `AST >= 46`), and which, as the Random Forest said, also have `selector == 2`, ie., the liver has symptoms of suffering from alcoholism:
 
-|mcv|alkphos|sgpt|**sgot**|gammagt|drinks|selector|
+mcv|alkphos|sgpt|**sgot**|gammagt|drinks|**selector**
 |--:|--:|--:|--:|--:|--:|--:|
-|91|72|155|**68**|82|0.5|2|
-|87|76|22|**55**|9|4.0|2|
-|90|96|34|**49**|169|4.0|2|
-|91|74|87|**50**|67|6.0|2|
-|93|84|58|**47**|62|7.0|2|
-|92|95|85|**48**|200|8.0|2|
-|91|62|59|**47**|60|8.0|2|
-|95|80|50|**64**|55|10.0|2|
-|98|74|148|**75**|159|0.5|2|
-|85|58|83|**49**|51|3.0|2|
+91|72|155|**68**|82|0.5|**2**
+87|76|22|**55**|9|4.0|**2**
+90|96|34|**49**|169|4.0|**2**
+91|74|87|**50**|67|6.0|**2**
+93|84|58|**47**|62|7.0|**2**
+92|95|85|**48**|200|8.0|**2**
+91|62|59|**47**|60|8.0|**2**
+95|80|50|**64**|55|10.0|**2**
+98|74|148|**75**|159|0.5|**2**
+85|58|83|**49**|51|3.0|**2**
+94|117|77|**56**|52|4.0|**2**
+91|86|52|**47**|52|4.0|**2**
+94|43|154|**82**|121|4.0|**2**
+102|82|34|**78**|203|7.0|**2**
+
+The only sample in the BUPA dataset which excepts the statistical majority inference of `sgot >= 46 : 2` ( `AST >= 46 : 2`) is:
+
+mcv|alkphos|sgpt|**sgot**|gammagt|drinks|**selector**
+|--:|--:|--:|--:|--:|--:|--:|
+98|66|103|**57**|114|6.0|**1**
+
+Related to this, the program is able to report the subset of training samples which statistically support about an inference a random tree gives. It is the `--dump` command line option, which prints, after each leaf of the tree, the subset of training samples under it (recall that one random sample is removed from the BUPA dataset to be used as the test set, so this will not appear):
+
+     mcv >= 85.5
+     |   gammagt >= 20.5
+     |   |   sgpt < 18.5 : 2 (20/0)
+                            ( mcv >= 85.5 ) and ( gammagt >= 20.5 ) and ( sgpt < 18.5 )
+                            mcv,alkphos,sgpt,sgot,gammagt,drinks,De_Ritis_Ratio,selector
+                            94,48,11,23,43,0.5,2.090909,2
+                            92,61,18,13,81,3,0.722222,2
+                            89,90,15,17,25,4,1.133333,2
+                            89,76,14,21,24,4,1.5,2
+                            87,64,16,20,24,5,1.25,2
+                            90,63,12,26,21,6,2.166667,2
+                            90,79,18,15,24,0.5,0.833333,2
+                            101,65,18,21,22,0.5,1.166667,2
+                            86,58,16,23,23,0.5,1.4375,2
+                            93,87,18,17,26,2,0.944444,1  <---------
+                            91,44,18,18,23,2,1,2
+                            93,45,11,14,21,4,1.272727,2
+                            91,63,17,17,46,4,1,2
+                            88,46,15,33,55,4,2.2,2
+                            99,42,14,21,49,5,1.5,2
+                            93,43,11,16,54,6,1.454545,1  <---------
+                            86,109,16,22,28,6,1.375,2
+                            97,80,17,20,53,8,1.176471,2
+
+Note in the example above that the majority of samples in this region have `selector` with value `2`, except those pointed out which have value `1`.
 
 Note: We could also have told WEKA to ignore the `drinks` attribute **before** building the Random Forest classifier, but in this case, all the trees would be without the `drinks` attribute, and we want those inferences where `drinks` do not influence the result, but `drinks` was nevertheless analyzed and potentially could have influenced each step of the inference. Ie., we do want to analyze the feature `drinks` in the inference, but to report those extreme trees (cases) of state of the liver where `drinks` no longer acts as a catalyst in them.
 

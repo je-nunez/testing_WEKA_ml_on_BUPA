@@ -227,7 +227,10 @@ object WekaClassifierOnBupaAlcoholism {
     * training data and applying it on the BUPA test data, and printing the
     * results.
     *
-    * @param args ignored so far.
+    * @param args the command-line arguments. Only "--dump" accepted so far,
+    *             which is a request to print the BUPA subset of samples
+    *             which statistically support, or hint, about each leaf in
+    *             the random tree -printed after each leaf is printed.
     */
 
   def main(args: Array[String]) {
@@ -335,11 +338,10 @@ object WekaClassifierOnBupaAlcoholism {
     *                       e.g., "drinks" to prune its subtrees where it was
     *                       needed for the inference.)
     *
-    * @param instancesClassif the instances that were used to build this
-    *                       classifier. This parameter is optional, and if it
-    *                       is given, then it means to report the subset of
-    *                       instances under the leaves of the trees as they
-    *                       are printed out.
+    * @param instances the instances that were used to build this classifier.
+    *                  This parameter is optional, and if it is given, then it
+    *                  means to report the subset of instances under the leaves
+    *                  of the trees as they are printed out.
     */
 
   def printInferencesWithoutDrinks(wekaClassifier: AbstractClassifier,
@@ -347,57 +349,113 @@ object WekaClassifierOnBupaAlcoholism {
                                    attribNamesToPrune: Array[String],
                                    instances: Option[Instances]) {
 
-    // The format of the print-out of the trees in a random forest in WEKA
-    // is in tree-preoder (the root of the tree appears in the first line,
-    // and lower subtrees appear indented in the following lines) and looks
-    // like (for the BUPA datase of influence of alcoholism on the liver):
-    //
-    //    ... (print-out of WEKA random tree on BUPA dataset)...
-    //    |   |   |   drinks >= 5.5
-    //    |   |   |   |   sgot < 45
-    //    |   |   |   |   |   drinks < 13.5
-    //
-    // where each "|" or (comparative-expression) creates a new branch in the
-    // tree. The relationship between the starts of the tokens (attribute
-    // names) in the line string and the level of the tree they are at in
-    // WEKA, is, if both are 0-based -ie., the root of the tree is at level 0:
-    //       index-start-token-in-string = 4 * its-level-in-tree
-    // We are going to parse (or filter) this tree transversal.
-    //
-    // What we want is to prune those subtrees which have "drinks" in it (or
-    // in general, to prune all subtrees under any attribute in the array
-    // "attribNamesToPrune" -we'll talk about "drinks" in this respect)
-    // because we want to see WEKA's inferences on the BUPA alcoholism dataset
-    // where the inference is not affected by the "drinks", ie., very healthy
-    // cases where "drinks" hasn't affected the liver, or very sick cases where
-    // the liver is so affected by alcoholism that that the number of "drinks"
-    // no longer has any effect on its biomarkers.
-
     // we'll do this task only for the Random Forest classifier we use
     val randomForest = wekaClassifier.asInstanceOf[MyCustomRandomForestOpenBagOfTrees]
 
     val treesRandomForest = randomForest.getTrees()
     for ( (strReprTree, treeIdx) <- treesRandomForest.zipWithIndex ) {
-      // first version of the code, this needs to be fixed: we need to implement
-      // a stack automata which scans every line of the tree and see if this
-      // line has a "drinks" token and in what position (tree-level):
-      //     if it does, then to skip all the following lines belonging to
-      //                      this same subtree
-      // and
-      //     if this line doesn't have "drinks", then push it in the stack, and
-      //                                              continue parsing this subtree
+
+      // process this WEKA random tree
+      val reportResult =
+        printATreePruningSomeAttribs(strReprTree, allAttribNames, attribNamesToPrune, instances)
+
+      if (reportResult == 1) {
+        println(f"---- Skipped reporting RandomTree $treeIdx")
+      } else if (reportResult == 2) {
+        val subtreesPruned = attribNamesToPrune.mkString(", ")
+        println(f"---- Finished reporting RandomTree $treeIdx pruning trees needing any of the attribs: $subtreesPruned")
+      }
+
+    }
+  }
+
+
+  /** Does the internal work for "printInferencesWithoutDrinks()". This
+    * method receives the WEKA representation of a random tree on the BUPA
+    * dataset of influence of alcoholism on the liver, and reports to
+    * the standard-output only those statistical inferences which don't have
+    * the attribute "drinks" in it as "printInferencesWithoutDrinks()" was
+    * requested to do. In general form, this method only prints those
+    * inferences which don't have any of the attributes in the parameter
+    * "attribNamesToPrune".
+    *
+    * @param strReprRandomTree a multi-line string with the representation
+    *                          given by WEKA of a random tree.
+    *
+    * @param allAttribNames the array of all attribute names of the instances
+    *                       classified by this random tree. (In this case, it
+    *                       is the array of all BUPA attribute names.)
+    *
+    * @param attribNamesToPrune the array of attribute names whose sub-trees
+    *                       to prune from the report in standard-output of the
+    *                       trees. (In this case, it is an array with some
+    *                       BUPA attribute names to be pruned from the report,
+    *                       e.g., "drinks" to prune its subtrees where it was
+    *                       needed for the inference.)
+    *
+    * @param instances the instances that were used to build this classifier.
+    *                  This parameter is optional, and if it is given, then it
+    *                  means to report the subset of instances under the leaves
+    *                  of the trees as they are printed out.
+    *
+    * @return an integer with the status of the report:
+    *                  value 0 if no tree was parsed -ie., this string contained
+    *                  WEKA statistics lines only, it did did not contain any
+    *                  attribute from the instances with the "|"-delimited format,
+    *                  etc-;
+    *                  value 1, if a tree was parsed but no leaf was printed
+    *                  because all were pruned (ie., no complete inference was
+    *                  found that did not contain any of the attributes in
+    *                  "attribNamesToPrune");
+    *                  value 2, if at least one leaf of this random tree was
+    *                  printed (ie., there was at least one complete inference
+    *                  from the root to a leaf which was clean of all attributes
+    *                  in "attribNamesToPrune")
+    */
+
+  def printATreePruningSomeAttribs(strReprRandomTree: String,
+                                   allAttribNames: Array[String],
+                                   attribNamesToPrune: Array[String],
+                                   instances: Option[Instances]): Int =
+    {
+
+      // The format of the print-out of the trees in a random forest in WEKA
+      // is in tree-preoder (the root of the tree appears in the first line,
+      // and lower subtrees appear indented in the following lines) and looks
+      // like (for the BUPA datase of influence of alcoholism on the liver):
+      //
+      //    ... (print-out of WEKA random tree on BUPA dataset)...
+      //    |   |   |   drinks >= 5.5
+      //    |   |   |   |   sgot < 45
+      //    |   |   |   |   |   drinks < 13.5
+      //
+      // where each "|" or (comparative-expression) creates a new branch in the
+      // tree. The relationship between the starts of the tokens (attribute
+      // names) in the line string and the level of the tree they are at in
+      // WEKA, is, if both are 0-based -ie., the root of the tree is at level 0:
+      //       index-start-token-in-string = 4 * its-level-in-tree
+      // We are going to parse (or filter) this tree transversal.
+      //
+      // What we want is to prune those subtrees which have "drinks" in it (or
+      // in general, to prune all subtrees under any attribute in the array
+      // "attribNamesToPrune" -we'll talk about "drinks" in this respect)
+      // because we want to see WEKA's inferences on the BUPA alcoholism dataset
+      // where the inference is not affected by the "drinks", ie., very healthy
+      // cases where "drinks" hasn't affected the liver, or very sick cases where
+      // the liver is so affected by alcoholism that that the number of "drinks"
+      // no longer has any effect on its biomarkers.
 
       var previousDrinksLevel = -1   // what is the string position of the current,
                                      // highest subtree that is under the influence
                                      // of "drinks" (we keep track only of the highest
                                      // current subtree that we are pruning)
       var logicalConditionsStack = new Stack[String]()  // the logical conditions
-                                         // that has been collected in the traversal
-                                         // of the WEKA tree so far
+                                                // that has been collected in the
+                                                // traversal of the WEKA tree so far
       var thisStringWasARandomTree = false
-      var thisRandomTreeHasBeenPrinted = false
+      var aLeafInTheTreeHasBeenPrinted = false
 
-      for ( lineTreeLevel <- strReprTree.split("\n") ) {
+      for ( lineTreeLevel <- strReprRandomTree.split("\n") ) {
         // we need to check this new line (tree-level) whether it has or not
         // the "drinks" attribute in it (we are interested only in those WEKA
         // statistical inferences where "drinks" was not necessary for them.
@@ -474,9 +532,18 @@ object WekaClassifierOnBupaAlcoholism {
                                            // transversing the tree again
              }
              if ( previousDrinksLevel == -1 ) { // we aren't currently under a
-                       // statistical inference subtree related with "drinks"
+                        // statistical inference subtree related with "drinks"
+
                println(lineTreeLevel)
-               thisRandomTreeHasBeenPrinted = true
+
+               // Try to see if the line we have just printed was a branch internal
+               // node in the tree, or a leaf
+               val wekaTreeLeafPatt = """ : [1-9][0-9]* \([1-9][0-9]*/[0-9]*\)""".r
+               val wekaTreeLeaf = wekaTreeLeafPatt findFirstMatchIn lineTreeLevel
+
+               if (wekaTreeLeaf.isDefined) {
+                 aLeafInTheTreeHasBeenPrinted = true
+               }
 
                if (instances.isDefined) {
                  // if the instances parameter was given to this method, we need
@@ -492,10 +559,9 @@ object WekaClassifierOnBupaAlcoholism {
                    truncateStackAtLength(logicalConditionsStack, levelStack)
 
                  // Try to extract the logical condition expressed in this line.
-                 // For this, we need to see if it is a leaf or a branch in the
-                 // WEKA random tree
-                 val wekaTreeLeafPatt = """ : [1-9][0-9]* \([1-9][0-9]*/[0-9]*\)""".r
-                 val wekaTreeLeaf = wekaTreeLeafPatt findFirstMatchIn lineTreeLevel
+                 // This depends if this line was a leaf or a branch in the WEKA
+                 // random tree
+
                  if ( ! wekaTreeLeaf.isDefined ) {
                    // this is a branch in the WEKA tree: the logical condition in
                    // this line is from the attribute token till the end of line
@@ -510,8 +576,9 @@ object WekaClassifierOnBupaAlcoholism {
                    // (Since this is a leaf, as an optimization we don't push this
                    //  leaf condition into the "logicalConditionsStack", for it would
                    //  immediately be pop-ed from it, for this is a leaf.)
-                   val conditionInThisLeaf =
-                     lineTreeLevel.substring(currPosAttrib, wekaTreeLeaf.get.start)
+                   val indexLeafSpecInLine = wekaTreeLeaf.get.start
+                   val conditionInThisLeaf = lineTreeLevel.substring(currPosAttrib,
+                                                                     indexLeafSpecInLine)
                    var wekaSubsetExpresssion = ""
                    if (logicalConditionsStack.length == 0) {
                      wekaSubsetExpresssion = f"( $conditionInThisLeaf )"
@@ -528,11 +595,10 @@ object WekaClassifierOnBupaAlcoholism {
                    }
 
                    reportInstancesWhichSupportThisInference(instances.get,
-                                                          wekaSubsetExpresssion,
-                                                          allAttribNames,
-                                                          currPosAttrib,
-                                                          attribNamesToPrune)
-
+                                                            wekaSubsetExpresssion,
+                                                            allAttribNames,
+                                                            indexLeafSpecInLine + 4,
+                                                            attribNamesToPrune)
                  }
                }
              }
@@ -543,16 +609,23 @@ object WekaClassifierOnBupaAlcoholism {
          }
        }
 
-       if (thisStringWasARandomTree) {
-         if (thisRandomTreeHasBeenPrinted) {
-           val subtreesPruned = attribNamesToPrune.mkString(", ")
-           println(f"---- Finished reporting RandomTree $treeIdx pruning trees needing any of the attribs: $subtreesPruned")
-         } else {
-           println(f"---- Skipped reporting RandomTree $treeIdx")
-         }
+       if (! thisStringWasARandomTree) {
+         // this "strReprRandomTree" passed by the caller, the parser determined that
+         // it contained totally some WEKA statitics, but no random tree (ie., this
+         // string representation did not contain any attribute from the instances
+         // with the "|"-delimited format, etc)
+
+         return 0
+
+       } else {
+         // this "strReprRandomTree" contained a WEKA random tree: was at least one
+         // leaf (complete inference) printed by this parser, or no leaf was
+         // printed because all inferences contained attributes to prune
+
+         return if (aLeafInTheTreeHasBeenPrinted) 2 else 1
        }
-     }
-   }
+    }
+
 
 
   /** prints to standard-output the subset of samples which support a
@@ -627,6 +700,8 @@ object WekaClassifierOnBupaAlcoholism {
     // report these subset of samples which support this inference by the random tree
     val arffSections = samplesWhichSupportThisInference.toString.split("(?sm)^@data$")
     val preffixIndent = " " * indentation
+    // write the logical condition in the random tree of this statistical inference
+    println(preffixIndent + inferenceConditions)
     // write the CSV header line for this subset of samples, indented
     print(preffixIndent)
     for ( (attribName, attribIdx) <- allAttribNames.zipWithIndex ) {
