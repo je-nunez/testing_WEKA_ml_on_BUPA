@@ -135,6 +135,8 @@ Related to this, the program is able to report the subset of training samples wh
      |   |   sgpt < 18.5 : 2 (20/0)
                             ( mcv >= 85.5 ) and ( gammagt >= 20.5 ) and ( sgpt < 18.5 )
                             mcv,alkphos,sgpt,sgot,gammagt,drinks,De_Ritis_Ratio,selector
+                            93,87,18,17,26,2,0.944444,1 <-------
+                            93,43,11,16,54,6,1.454545,1 <-------
                             94,48,11,23,43,0.5,2.090909,2
                             92,61,18,13,81,3,0.722222,2
                             89,90,15,17,25,4,1.133333,2
@@ -144,17 +146,16 @@ Related to this, the program is able to report the subset of training samples wh
                             90,79,18,15,24,0.5,0.833333,2
                             101,65,18,21,22,0.5,1.166667,2
                             86,58,16,23,23,0.5,1.4375,2
-                            93,87,18,17,26,2,0.944444,1  <---------
                             91,44,18,18,23,2,1,2
                             93,45,11,14,21,4,1.272727,2
                             91,63,17,17,46,4,1,2
                             88,46,15,33,55,4,2.2,2
                             99,42,14,21,49,5,1.5,2
-                            93,43,11,16,54,6,1.454545,1  <---------
                             86,109,16,22,28,6,1.375,2
                             97,80,17,20,53,8,1.176471,2
+                            ---- (Summary of observations under this leaf: with classifier value 2: 16; others: 2)
 
-The majority of the instances in this region above have `selector` with value `2`, except those pointed out which have value `1`.
+The majority of the instances in this region above have `selector` with value `2`, except those pointed out which have value `1`. Note that this print-out marks with a `<-------` those training instances which satisfy the logical condition in this tree-transversal but have a distinct value of the selector at the leaf at the end of this transversal. E.g., in the example above, the report lists the training instances which satisfy the logical condition `( mcv >= 85.5 ) and ( gammagt >= 20.5 ) and ( sgpt < 18.5 )`, and marks with `<-------` those instances whose `selector` value is distinct to the value at the leaf, `2`. This might be useful as to separate the observations which satisfy the same logical condition but with different selector values, so there could be other hidden Bayesian influences or confounding biomarkers at work around these values. At the end of the dump under a leaf, the program also gives a summary of how many BUPA observations agreed with the value of the selector at the leaf and how many were distinct.
 
 Note: We could also have told WEKA to ignore the `drinks` attribute **before** building the Random Forest classifier, but in this case, all the trees would be without the `drinks` attribute, and we want those inferences where `drinks` do not influence the result, but `drinks` was nevertheless analyzed and potentially could have influenced each step of the inference. Ie., we do want to analyze the feature `drinks` in the inference, but to report those extreme trees (cases) of state of the liver where `drinks` no longer acts as a catalyst in them.
 

@@ -455,6 +455,30 @@ object WekaClassifierOnBupaAlcoholism {
       var thisStringWasARandomTree = false
       var aLeafInTheTreeHasBeenPrinted = false
 
+      // this method dumps the subset of samples which support a statistical inference
+      // found by WEKA in a tree of a random forest. This is requested by passing some
+      // into the parameter "instances" to this method, with should have the training
+      // data used to build the classification. For this report it employs another method,
+      // reportInstancesWhichSupportThisInference(...), below. Just that, since this is a
+      // 'raw' reporting of the original training data, instead of reporting from the
+      // "instances" parameter directly, it prefers to sort this set by the classification
+      // column and to report on this sorting, for this ordering is more useful to a human
+      // reader. (This sorted report of the BUPA dataset is the least 'visualization'
+      // we can do somehow inspired in the ideas from the book 'Semiology of Graphics:
+      // Diagrams, Networks, Maps' by Jacques Bertin. A stronger visualization under this
+      // inspiration is not merely this sorting, but also coloring with distinctive colors
+      // the inference attributes used in each step (branch-level) by the random tree, but
+      // for this coloring we need start we need standard ANSI/ISO escape sequences.)
+
+      if (instances.isDefined) {
+        // this is an optimization. We sort just once before each call to
+        //    reportInstancesWhichSupportThisInference(...)
+        // at each leaf in the inference tree, otherwise to sort inside this other method
+        // for each call would be slower.
+        instances.get.stableSort(allAttribNames.length - 1)   // sort by classification attrib
+      }
+
+
       for ( lineTreeLevel <- strReprRandomTree.split("\n") ) {
         // we need to check this new line (tree-level) whether it has or not
         // the "drinks" attribute in it (we are interested only in those WEKA
@@ -538,7 +562,7 @@ object WekaClassifierOnBupaAlcoholism {
 
                // Try to see if the line we have just printed was a branch internal
                // node in the tree, or a leaf
-               val wekaTreeLeafPatt = """ : [1-9][0-9]* \([1-9][0-9]*/[0-9]*\)""".r
+               val wekaTreeLeafPatt = """ : ([1-9][0-9]*) \([1-9][0-9]*/[0-9]*\)""".r
                val wekaTreeLeaf = wekaTreeLeafPatt findFirstMatchIn lineTreeLevel
 
                if (wekaTreeLeaf.isDefined) {
@@ -594,8 +618,11 @@ object WekaClassifierOnBupaAlcoholism {
                                                " and ( " + conditionInThisLeaf + " )"
                    }
 
+                   // which was the value of the classifier inferred in this leaf
+                   val classifierValueInferredInLeaf = wekaTreeLeaf.get.group(1)
                    reportInstancesWhichSupportThisInference(instances.get,
                                                             wekaSubsetExpresssion,
+                                                            classifierValueInferredInLeaf,
                                                             allAttribNames,
                                                             indexLeafSpecInLine + 4,
                                                             attribNamesToPrune)
@@ -629,7 +656,7 @@ object WekaClassifierOnBupaAlcoholism {
 
 
   /** prints to standard-output the subset of samples which support a
-    * statistical inference found by WEKA in a tree of a ramdom forest.
+    * statistical inference found by WEKA in a tree of a random forest.
     * The print-out is in CSV format, with a header line and an
     * indentation prefix in the report to alineate it with the leaf in
     * the tree that is reporting the subset of samples about
@@ -662,6 +689,7 @@ object WekaClassifierOnBupaAlcoholism {
 
   def reportInstancesWhichSupportThisInference(universeSamples: Instances,
                                                inferenceConditions: String,
+                                               inferredClassifierValue: String,
                                                allAttribNames: Array[String],
                                                indentation: Int,
                                                attribNamesNotExpected: Array[String] ) {
@@ -678,6 +706,8 @@ object WekaClassifierOnBupaAlcoholism {
       // attribPruned can't be in the "inferenceConditions", so:
       assert(! firstPosition.isDefined)
     }
+
+    val visualizationRemark = "," + inferredClassifierValue
 
     // substitute all attribute names in "inferenceConditions" by their corresponding
     // "ATT<idx#>" tag that WEKA's SubsetByExpression instance filter expects
@@ -708,8 +738,39 @@ object WekaClassifierOnBupaAlcoholism {
       print(if (attribIdx > 0) f",$attribName" else attribName)
     }
     println()
+    // report now the raw instances
+    var countRemarkedLines = 0
+    var countNonRemarkedLines = 0
     for ( csvLine <- arffSections(1).split("\n") if (! csvLine.isEmpty) ) {
-      println(preffixIndent + csvLine)
+      print(preffixIndent + csvLine)
+      if (csvLine.indexOf(",") != 1) {
+        // make sure this "csvLine" does contain at least a comma, ie., it seems it
+        // is csv line (a stronger check is to split(",") this "csvLine" and confirm
+        // that the split has allAttribNames.length values, ie., entries for each attrib
+
+        if (csvLine.endsWith(visualizationRemark)) {
+          countRemarkedLines += 1
+          println()
+        } else {
+          countNonRemarkedLines += 1
+          println(" <-------")
+        }
+      } else {
+        println()
+      }
+    }
+    // at the end print a quick summary of this report of the raw instances matching the
+    // statistical inference from this leaf in an inference tree (a more detailed summary
+    // would be to use the WEKA statistics on the filtered subset of instances
+    // "samplesWhichSupportThisInference" using reports on WEKA's meanOrMode(int attIndex),
+    // variance(int attIndex), or even kthSmallestValue(int attIndex, int k))
+
+    print(preffixIndent + "---- (Summary of observations under this leaf: with classifier value " +
+          inferredClassifierValue + f": $countRemarkedLines; others: $countNonRemarkedLines")
+    if (countRemarkedLines <= countNonRemarkedLines) {
+      println(" ---- note: use it with prudence)")
+    } else {
+      println(")")
     }
   }
 
